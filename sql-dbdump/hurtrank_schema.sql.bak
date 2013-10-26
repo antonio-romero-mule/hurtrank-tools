@@ -1,0 +1,235 @@
+-- 
+-- Structure for table `daily_hurtrank`
+-- 
+
+DROP TABLE IF EXISTS `daily_hurtrank`;
+CREATE TABLE IF NOT EXISTS `daily_hurtrank` (
+  `d` date NOT NULL,
+  `hurtrank` float DEFAULT NULL,
+  `total_views` int(11) DEFAULT NULL,
+  `total_ratings` int(11) DEFAULT NULL,
+  `today_views` int(11) DEFAULT NULL,
+  `today_ratings` int(11) DEFAULT NULL,
+  PRIMARY KEY (`d`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+-- 
+-- Structure for table `dim_date`
+-- 
+
+DROP TABLE IF EXISTS `dim_date`;
+CREATE TABLE IF NOT EXISTS `dim_date` (
+  `date_key` int(11) NOT NULL,
+  `date_value` date DEFAULT NULL,
+  `date_iso` char(10) DEFAULT NULL,
+  `year` smallint(6) DEFAULT NULL,
+  `quarter` tinyint(4) DEFAULT NULL,
+  `quarter_name` char(2) DEFAULT NULL,
+  `month` tinyint(4) DEFAULT NULL,
+  `month_name` varchar(10) DEFAULT NULL,
+  `month_abbreviation` varchar(10) DEFAULT NULL,
+  `week` char(2) DEFAULT NULL,
+  `day_of_month` tinyint(4) DEFAULT NULL,
+  `day_of_year` smallint(6) DEFAULT NULL,
+  `day_of_week` smallint(6) DEFAULT NULL,
+  `day_name` varchar(10) DEFAULT NULL,
+  `day_abbreviation` varchar(10) DEFAULT NULL,
+  `is_weekend` tinyint(4) DEFAULT NULL,
+  `is_weekday` tinyint(4) DEFAULT NULL,
+  `is_today` tinyint(4) DEFAULT NULL,
+  `is_yesterday` tinyint(4) DEFAULT NULL,
+  `is_this_week` tinyint(4) DEFAULT NULL,
+  `is_last_week` tinyint(4) DEFAULT NULL,
+  `is_this_month` tinyint(4) DEFAULT NULL,
+  `is_last_month` tinyint(4) DEFAULT NULL,
+  `is_this_year` tinyint(4) DEFAULT NULL,
+  `is_last_year` tinyint(4) DEFAULT NULL,
+  PRIMARY KEY (`date_key`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AVG_ROW_LENGTH=103;
+
+-- 
+-- Structure for table `normalized_traffic`
+-- 
+
+DROP TABLE IF EXISTS `normalized_traffic`;
+CREATE TABLE IF NOT EXISTS `normalized_traffic` (
+  `path` varchar(127) NOT NULL,
+  `date` date NOT NULL,
+  `views` int(11) NOT NULL,
+  UNIQUE KEY `UK_normalized_traffic` (`date`,`path`),
+  KEY `IDX_normalized_traffic_date` (`date`),
+  KEY `IDX_normalized_traffic_path` (`path`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AVG_ROW_LENGTH=391 ROW_FORMAT=FIXED COMMENT='traffic by day, paths normalized and aggregated etc..';
+
+-- 
+-- Structure for table `raw_ratings`
+-- 
+
+DROP TABLE IF EXISTS `raw_ratings`;
+CREATE TABLE IF NOT EXISTS `raw_ratings` (
+  `COMMENT_ID` int(11) NOT NULL DEFAULT '0' COMMENT 'primary key but assigned by comment collection script',
+  `IGNORE` varchar(2) DEFAULT NULL,
+  `RATE` int(1) DEFAULT NULL,
+  `COMMENT_DATE` date DEFAULT NULL,
+  `EMAIL` varchar(255) DEFAULT NULL,
+  `COMMENT_VALUE` varchar(2048) DEFAULT NULL,
+  `SUGGESTION_VALUE` varchar(2048) DEFAULT NULL,
+  `USERNAME` varchar(32) DEFAULT NULL,
+  `URL` varchar(255) DEFAULT NULL,
+  `STATE` varchar(45) DEFAULT NULL,
+  `COUNTRY` varchar(45) DEFAULT NULL,
+  `IP` varchar(20) DEFAULT NULL,
+  `HOST` varchar(255) DEFAULT NULL,
+  `RESOLUTION` varchar(1024) DEFAULT NULL,
+  PRIMARY KEY (`COMMENT_ID`),
+  KEY `URL_IX` (`URL`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+-- 
+-- Structure for table `raw_traffic`
+-- 
+
+DROP TABLE IF EXISTS `raw_traffic`;
+CREATE TABLE IF NOT EXISTS `raw_traffic` (
+  `path` varchar(127) DEFAULT NULL,
+  `date` date DEFAULT NULL,
+  `views` int(11) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Traffic per page per day, extracted from GA, imported by script. Needs normalizing etc..';
+
+-- 
+-- Structure for table `recent_views`
+-- 
+
+DROP TABLE IF EXISTS `recent_views`;
+CREATE TABLE IF NOT EXISTS `recent_views` (
+  `path` varchar(127) NOT NULL,
+  `views` int(11) NOT NULL,
+  PRIMARY KEY (`path`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- 
+-- View `earliest_ratings_by_page`
+-- 
+
+DROP VIEW IF EXISTS `earliest_ratings_by_page`;
+CREATE ALGORITHM=UNDEFINED DEFINER=`hurtuser`@`%` SQL SECURITY DEFINER VIEW `earliest_ratings_by_page` AS select `r`.`URL` AS `path`,min(`r`.`COMMENT_DATE`) AS `first_rate_date` from `ratings` `r` group by `r`.`URL`;
+
+-- 
+-- View `formatted_ratings`
+-- 
+
+DROP VIEW IF EXISTS `formatted_ratings`;
+CREATE ALGORITHM=UNDEFINED DEFINER=`hurtuser`@`%` SQL SECURITY DEFINER VIEW `formatted_ratings` AS select `ratings`.`COMMENT_ID` AS `comment_ID`,`ratings`.`COMMENT_DATE` AS `comment_date`,`ratings`.`RATE` AS `rate`,replace(`ratings`.`URL`,'+',' ') AS `URL`,if((length(concat(trim(`ratings`.`USERNAME`),trim(`ratings`.`EMAIL`))) > 0),concat(`ratings`.`USERNAME`,' (',`ratings`.`EMAIL`,')'),'') AS `contact`,concat(`ratings`.`COMMENT_VALUE`,'   ',`ratings`.`SUGGESTION_VALUE`) AS `comment_value` from `ratings` order by `ratings`.`COMMENT_ID` desc;
+
+-- 
+-- View `rating_trends`
+-- 
+
+DROP VIEW IF EXISTS `rating_trends`;
+CREATE ALGORITHM=UNDEFINED DEFINER=`hurtuser`@`%` SQL SECURITY DEFINER VIEW `rating_trends` AS select concat(date_format(makedate(year(`r`.`COMMENT_DATE`),(week(`r`.`COMMENT_DATE`,0) * 7)),'%b %e')) AS `year_and_week`,sum((`r`.`RATE` = 1)) AS `rated1`,sum((`r`.`RATE` = 2)) AS `rated2`,sum((`r`.`RATE` = 3)) AS `rated3`,sum((`r`.`RATE` = 4)) AS `rated4`,sum((`r`.`RATE` = 5)) AS `rated5`,count(0) AS `TOTAL_RATECOUNT` from `ratings` `r` where ((`r`.`COMMENT_DATE` + interval 26 week) > now()) group by yearweek(`r`.`COMMENT_DATE`,0) order by yearweek(`r`.`COMMENT_DATE`,0),`r`.`RATE`;
+
+-- 
+-- View `ratings`
+-- 
+
+DROP VIEW IF EXISTS `ratings`;
+CREATE ALGORITHM=UNDEFINED DEFINER=`hurtuser`@`%` SQL SECURITY DEFINER VIEW `ratings` AS select `raw_ratings`.`COMMENT_ID` AS `COMMENT_ID`,`raw_ratings`.`RATE` AS `RATE`,`normalized_path`(`raw_ratings`.`URL`) AS `URL`,`raw_ratings`.`RESOLUTION` AS `RESOLUTION`,`raw_ratings`.`EMAIL` AS `EMAIL`,`raw_ratings`.`USERNAME` AS `USERNAME`,`raw_ratings`.`COMMENT_DATE` AS `COMMENT_DATE`,`raw_ratings`.`COMMENT_VALUE` AS `COMMENT_VALUE`,`raw_ratings`.`SUGGESTION_VALUE` AS `SUGGESTION_VALUE`,`raw_ratings`.`STATE` AS `STATE`,`raw_ratings`.`COUNTRY` AS `COUNTRY`,`raw_ratings`.`IP` AS `IP`,`raw_ratings`.`HOST` AS `HOST` from `raw_ratings` where ((`raw_ratings`.`RATE` > 0) and (1 or (not((`raw_ratings`.`EMAIL` like '@mulesoft%'))) or (not((`raw_ratings`.`EMAIL` like '@mulesource%')))));
+
+-- 
+-- View `ratings_agg_per_page`
+-- 
+
+DROP VIEW IF EXISTS `ratings_agg_per_page`;
+CREATE ALGORITHM=UNDEFINED DEFINER=`hurtuser`@`%` SQL SECURITY DEFINER VIEW `ratings_agg_per_page` AS select max(`ratings`.`COMMENT_DATE`) AS `latest_comment`,`ratings`.`URL` AS `url`,count(0) AS `comment_count`,min(`ratings`.`COMMENT_DATE`) AS `earliest_comment` from `ratings` group by `ratings`.`URL` order by max(`ratings`.`COMMENT_DATE`) desc,`ratings`.`URL`;
+
+-- 
+-- View `recent_rated_views`
+-- 
+
+DROP VIEW IF EXISTS `recent_rated_views`;
+CREATE ALGORITHM=UNDEFINED DEFINER=`hurtuser`@`%` SQL SECURITY DEFINER VIEW `recent_rated_views` AS select `recent_views`.`path` AS `path`,`recent_views`.`views` AS `views` from (`recent_views` join `ratings`) where (`recent_views`.`path` = `ratings`.`URL`);
+
+-- 
+-- Function `agg_hurtrankfn`
+-- 
+
+DROP FUNCTION IF EXISTS `agg_hurtrankfn`;
+;
+
+-- 
+-- Function `agg_hurtrankfn_rated_pages_only`
+-- 
+
+DROP FUNCTION IF EXISTS `agg_hurtrankfn_rated_pages_only`;
+;
+
+-- 
+-- Function `agg_hurtrank_daterangesfn`
+-- 
+
+DROP FUNCTION IF EXISTS `agg_hurtrank_daterangesfn`;
+;
+
+-- 
+-- Function `basepath`
+-- 
+
+DROP FUNCTION IF EXISTS `basepath`;
+;
+
+-- 
+-- Procedure `buildranktable`
+-- 
+
+DROP PROCEDURE IF EXISTS `buildranktable`;
+;
+
+-- 
+-- Procedure `hurtrank_by_quarter`
+-- 
+
+DROP PROCEDURE IF EXISTS `hurtrank_by_quarter`;
+;
+
+-- 
+-- Procedure `load_normalized_traffic`
+-- 
+
+DROP PROCEDURE IF EXISTS `load_normalized_traffic`;
+;
+
+-- 
+-- Procedure `load_rated_traffic`
+-- 
+
+DROP PROCEDURE IF EXISTS `load_rated_traffic`;
+;
+
+-- 
+-- Function `normalized_path`
+-- 
+
+DROP FUNCTION IF EXISTS `normalized_path`;
+;
+
+-- 
+-- Procedure `populate_all_hurtranks`
+-- 
+
+DROP PROCEDURE IF EXISTS `populate_all_hurtranks`;
+;
+
+-- 
+-- Procedure `p_load_dim_date`
+-- 
+
+DROP PROCEDURE IF EXISTS `p_load_dim_date`;
+;
+
+-- 
+-- Procedure `p_update_dim_date`
+-- 
+
+DROP PROCEDURE IF EXISTS `p_update_dim_date`;
+;
+
