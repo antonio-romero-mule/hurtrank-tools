@@ -22,7 +22,6 @@ MySQL processing
 Google Apps Script and Spreadsheet
 * github: google-script directory
 * Each makes JDBC connection to MySQL DB, runs desired queries, and posts results to a Google Spreadsheet named range. These run every two hours.
-
 * Google Spreadsheet here:	 https://docs.google.com/a/mulesoft.com/spreadsheet/ccc?key=0AqXwDUi2oP6hdG02c1N0S2Q2YmVjODV5ejN0OW5OUkE&usp=drive_web#gid=0
 * Tabs capture MySQL query results in named ranges
 * Google Sites graphing widgets pull data from here
